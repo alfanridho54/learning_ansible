@@ -1,0 +1,23 @@
+# Lab SSH — local only (never commit private keys)
+lab/ssh/*
+!lab/ssh/README.md
+!lab/ssh/.gitkeep
+
+# Ansible
+*.retry
+.vault_pass
+vault-password.txt
+**/tmp-passwords/
+
+# App build / release artifacts (upload to GitHub yourself)
+apps/cinema-pos/node_modules/
+apps/cinema-pos/dist/
+apps/cinema-pos/artifacts/
+
+# Local secrets / vault
+**/vault.yml
+!**/*.example
+!**/*.yaml.example
+
+# OS junk
+.DS_Store

@@ -1,0 +1,27 @@
+services:
+  outlet-jkt:
+    build: .
+    container_name: cinema-outlet-jkt
+    hostname: outlet-jkt
+    ports:
+      - "2221:22"
+      - "8081:80"
+    restart: unless-stopped
+
+  outlet-bdg:
+    build: .
+    container_name: cinema-outlet-bdg
+    hostname: outlet-bdg
+    ports:
+      - "2222:22"
+      - "8082:80"
+    restart: unless-stopped
+
+  outlet-sby:
+    build: .
+    container_name: cinema-outlet-sby
+    hostname: outlet-sby
+    ports:
+      - "2223:22"
+      - "8083:80"
+    restart: unless-stopped

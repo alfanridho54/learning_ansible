@@ -1,0 +1,10 @@
+---
+# Copy to vault.yml and encrypt:
+#   cp vault.yml.example vault.yml
+#   ansible-vault encrypt inventories/lab/group_vars/vault.yml
+#
+# Then run playbooks with --ask-vault-pass (or --vault-password-file).
+
+vault_github_token: "ghp_CHANGE_ME_classic_or_fine_grained_read_contents"
+vault_pos_encryption_key: "cinema-lab-32char-secret-key!!!!"
+vault_postgres_password: "cinema-lab-change-me"

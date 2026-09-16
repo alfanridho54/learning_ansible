@@ -1,0 +1,184 @@
+---
+# Bootstrap cinema POS updater: GitHub ZIP + version.json poll + encrypted secrets.
+# Does NOT copy dist/ from control node — artifact comes from private GitHub.
+# Lab Docker (sshd-only): cron every 5 min. Real VMs: systemd timer.
+
+- name: Ensure Node.js / curl / unzip present
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - curl
+      - unzip
+      - cron
+    state: present
+    update_cache: true
+  tags: [pos]
+
+- name: Detect systemd (absent on lab Docker sshd image)
+  ansible.builtin.command: systemctl is-system-running
+  register: pos_systemd_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [pos]
+
+- name: Set fact pos_has_systemd
+  ansible.builtin.set_fact:
+    pos_has_systemd: "{{ pos_systemd_check.rc == 0 }}"
+  tags: [pos]
+
+- name: Create cinema-pos directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ pos_web_root }}", owner: www-data, group: www-data, mode: "0755" }
+    - { path: "{{ pos_releases_dir }}", owner: www-data, group: www-data, mode: "0755" }
+    - { path: "{{ pos_opt_dir }}", owner: root, group: root, mode: "0750" }
+    - { path: "{{ pos_log_dir }}", owner: root, group: www-data, mode: "0750" }
+  tags: [pos]
+
+- name: Install public outlet config.json (preserved across ZIP updates)
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ pos_web_root }}/{{ pos_config_filename }}"
+    owner: www-data
+    group: www-data
+    mode: "0644"
+  tags: [pos]
+
+- name: Copy encrypt/decrypt helpers to /opt/cinema-pos
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ pos_opt_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - encrypt-config.js
+    - decrypt-config.js
+  tags: [pos]
+
+- name: Generate encrypted config.enc (DATABASE_URL) outside web root
+  ansible.builtin.command:
+    argv:
+      - "{{ pos_node_bin }}"
+      - "{{ pos_opt_dir }}/encrypt-config.js"
+      - "{{ pos_database_url }}"
+      - "{{ pos_encryption_key }}"
+      - "{{ pos_config_enc_path }}"
+  args:
+    chdir: "{{ pos_opt_dir }}"
+  no_log: true
+  tags: [pos, secrets]
+
+- name: Restrict permissions on config.enc
+  ansible.builtin.file:
+    path: "{{ pos_config_enc_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [pos, secrets]
+
+- name: Install GitHub version-check updater script
+  ansible.builtin.template:
+    src: cinema_pos_version.sh.j2
+    dest: "{{ pos_version_script }}"
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [pos]
+
+# --- systemd path (on-prem VMs with systemd) ---
+- name: Install cinema-pos-version systemd oneshot service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cinema-pos-version.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Download cinema-pos version.json / ZIP from private GitHub
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart={{ pos_version_script }}
+      User=root
+      Group=root
+
+      [Install]
+      WantedBy=multi-user.target
+  when: pos_has_systemd | bool
+  notify: Restart cinema-pos-version timer
+  tags: [pos]
+
+- name: Install cinema-pos-version systemd timer (every 5 minutes)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cinema-pos-version.timer
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Check cinema-pos GitHub version every 5 minutes
+
+      [Timer]
+      OnBootSec=1min
+      OnUnitActiveSec=5min
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  when: pos_has_systemd | bool
+  notify: Restart cinema-pos-version timer
+  tags: [pos]
+
+- name: Enable and start cinema-pos-version.timer
+  ansible.builtin.systemd:
+    name: cinema-pos-version.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: pos_has_systemd | bool
+  tags: [pos]
+
+# --- cron fallback (lab Docker without systemd) ---
+- name: Ensure cron is running (lab Docker)
+  ansible.builtin.service:
+    name: cron
+    state: started
+    enabled: true
+  when: not (pos_has_systemd | bool)
+  failed_when: false
+  tags: [pos]
+
+- name: Install cron job for cinema-pos version check every 5 minutes
+  ansible.builtin.cron:
+    name: "cinema-pos-version-check"
+    minute: "*/5"
+    user: root
+    job: "{{ pos_version_script }} >> {{ pos_log_dir }}/cron.log 2>&1"
+    state: present
+  when: not (pos_has_systemd | bool)
+  tags: [pos]
+
+- name: Trigger first install / update immediately
+  ansible.builtin.command:
+    argv:
+      - "{{ pos_version_script }}"
+  register: pos_first_pull
+  failed_when: false
+  changed_when: pos_first_pull.rc == 0
+  tags: [pos]
+
+- name: Warn if GitHub first pull failed (token / artifact missing)
+  ansible.builtin.debug:
+    msg: >-
+      First pull from GitHub failed (rc={{ pos_first_pull.rc }}).
+      Set vault_github_token and upload
+      {{ pos_github_path_zip }} + {{ pos_github_path_version }}
+      to {{ pos_github_owner }}/{{ pos_github_repo }} (ref {{ pos_github_ref }}).
+      See {{ pos_log_dir }}/version.log on the outlet.
+  when: pos_first_pull.rc | default(1) != 0
+  tags: [pos]

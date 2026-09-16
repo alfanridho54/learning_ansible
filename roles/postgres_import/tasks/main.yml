@@ -1,0 +1,35 @@
+---
+- name: Ensure databases exist
+  shell: |
+    PGPASSWORD='{{ item.password }}' psql -U {{ item.user }} -h {{ item.host }} -tc \
+    "SELECT 1 FROM pg_database WHERE datname = '{{ item.db_name }}';" | grep -q 1 || \
+    PGPASSWORD='{{ item.password }}' psql -U {{ item.user }} -h {{ item.host }} -c \
+    "CREATE DATABASE {{ item.db_name }};"
+  args:
+    executable: /bin/bash
+  loop: "{{ postgresql_import.databases }}"
+
+- name: Copy SQL file to remote server
+  copy:
+    src: "{{ item.sql_file_src }}"
+    dest: "{{ item.sql_file_dest }}"
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  when: item.sql_file_src is defined
+  loop: "{{ postgresql_import.databases }}"
+
+- name: Import SQL data into PostgreSQL databases
+  shell: |
+    PGPASSWORD='{{ item.password }}' psql -U {{ item.user }} -d {{ item.db_name }} -h {{ item.host }} -f {{ item.sql_file_dest }}
+  args:
+    executable: /bin/bash
+  when: item.sql_file_dest is defined
+  loop: "{{ postgresql_import.databases }}"
+
+- name: Remove SQL file from remote server
+  file:
+    path: "{{ item.sql_file_dest }}"
+    state: absent
+  loop: "{{ postgresql_import.databases }}"
+

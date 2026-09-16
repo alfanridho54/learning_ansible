@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Configuration
+DB_USER="{{ postgresql_user }}"
+DB_HOST="{{ postgresql_host }}"
+BACKUP_DIR="{{ postgresql_backup_dir }}"
+TIMESTAMP=$(date +"%Y-%m-%d")
+BACKUP_FILE="$BACKUP_DIR/all_databases_backup_$TIMESTAMP.sql"
+
+# Perform the backup of all databases
+pg_dumpall -h "$DB_HOST" -U "$DB_USER" > "$BACKUP_FILE"
+
+# Remove backups older than {{ postgresql_backup_retention_days }} days
+find "$BACKUP_DIR" -type f -name "*.sql" -mtime +{{ postgresql_backup_retention_days }} -exec rm {} \;
+
+echo "Backup of all databases completed: $BACKUP_FILE"

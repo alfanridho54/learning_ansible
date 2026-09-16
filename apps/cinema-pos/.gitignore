@@ -1,0 +1,4 @@
+# Local build artifacts for GitHub upload (never commit zip / version bumps with secrets)
+artifacts/
+node_modules/
+dist/

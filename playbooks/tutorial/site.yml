@@ -1,0 +1,33 @@
+---
+- name: Deploy cinema outlet stack (tutorial lab)
+  hosts: outlets
+  become: true
+  serial: 1
+  vars:
+    common_hostname: "{{ device_hostname }}"
+    common_packages:
+      - curl
+      - vim
+      - git
+      - unzip
+      - python3
+      - python3-psycopg2
+      - rsync
+      - ca-certificates
+    common_environment_vars:
+      - { key: 'cinema_id', value: '{{ cinema_id }}' }
+      - { key: 'cinema_name', value: '{{ cinema_name }}' }
+      - { key: 'outlet_code', value: '{{ outlet_code }}' }
+  vars_files:
+    - vars/postgresql-lab.yaml
+  roles:
+    - role: commons
+      tags: [common, bootstrap]
+    - role: postgres
+      tags: [postgresql, database]
+    - role: postgres_import
+      tags: [postgresql, seed]
+    - role: nginx
+      tags: [nginx, web]
+    - role: cinema_pos_static
+      tags: [pos, app]

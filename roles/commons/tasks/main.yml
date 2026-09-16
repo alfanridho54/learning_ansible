@@ -1,0 +1,150 @@
+---
+# Update and upgrade apt packages
+# - name: Update apt cache
+#   apt:
+#     update_cache: yes
+
+# - name: Upgrade all packages
+#   apt:
+#     upgrade: dist
+#   when: common_perform_upgrade | default(false)
+
+#hostname
+- name: Build hostname string
+  set_fact:
+    hostname_string: "{{ common_hostname }}"
+
+- name: Output final hostname string
+  debug:
+    msg: "{{ hostname_string }}"
+
+- name: Set hostname
+  hostname:
+    name: "{{ hostname_string }}"
+  register: hostname
+
+- name: Add IP and domain into /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ item.ip }}\t{{ item.hostname }}"
+    regexp: "^{{ item.ip }}\\s+"
+    state: present
+  loop: "{{ common_hosts_entries }}"
+  loop_control:
+    label: "{{ item.ip }} -> {{ item.hostname }}"
+
+- name: Set in /etc/hosts
+  lineinfile:
+    regexp: "^127.0.0.1"
+    dest: "/etc/hosts"
+    line: "127.0.0.1   localhost   {{ hostname.name }}"
+  when: hostname.changed
+
+- name: Set in /etc/hosts
+  replace:
+    regexp: "{{ ansible_hostname }}"
+    dest: "/etc/hosts"
+    replace: "{{ hostname.name }}"
+  when: hostname.changed
+
+
+# Install common packages
+- name: Install common packages
+  apt:
+    name: "{{ common_packages }}"
+    state: present
+  when : common_packages is defined
+
+# Configure timezone
+- name: Set timezone
+  timezone:
+    name: "{{ common_timezone }}"
+  when: common_timezone is defined
+  ignore_errors: true
+
+# Create common users
+- name: Create common users
+  user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups | default(omit) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    state: "{{ item.state }}"
+  with_items: "{{ common_users }}"
+  when: common_users is defined
+
+#set env variable
+- name: Ensure environment variables are set in /etc/environment
+  lineinfile:
+    path: /etc/environment
+    regexp: "^{{ item.key }}="
+    line: '{{ item.key }}="{{ item.value }}"'
+    state: present
+  loop: "{{ common_environment_vars }}"
+  when: common_environment_vars | length > 0
+
+- name: Set systemd manager environment variable
+  command: systemctl set-environment ROLE={{common_environment_vars | selectattr('key', 'equalto', 'role') | map(attribute='value') | first }}
+  when:
+    - common_enable_production_extras | default(true)
+    - common_environment_vars | selectattr('key', 'equalto', 'role') | list | length > 0
+
+- name: Create systemd manager environment ROLE=Primary/Backup
+  when:
+    - common_enable_production_extras | default(true)
+    - common_environment_vars | selectattr('key', 'equalto', 'role') | list | length > 0
+  block:
+    - name: Create systemd manager drop-in directory
+      file:
+        path: /etc/systemd/system.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Configure systemd manager environment for ROLE
+      copy:
+        dest: /etc/systemd/system.conf.d/role.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Manager]
+          Environment=ROLE={{common_environment_vars | selectattr('key', 'equalto', 'role') | map(attribute='value') | first }}
+
+    - name: Reload systemd to apply manager environment
+      command: systemctl daemon-reexec
+      become: true
+
+    - name: Show systemd manager environment ROLE
+      command: systemctl show-environment
+      register: systemd_env
+
+- name: Create /opt/cinema_outlet directory
+  ansible.builtin.file:
+    path: /opt/cinema_outlet
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+
+#SET DNS Resolver
+- name: Configure DNS resolver
+  lineinfile:
+    path: /etc/systemd/resolved.conf
+    regexp: '^DNS='
+    line: 'DNS=172.16.1.2 172.16.4.132'
+    create: yes
+  when: common_enable_production_extras | default(true)
+
+- name: Configure search domain
+  lineinfile:
+    path: /etc/systemd/resolved.conf
+    regexp: '^Domains='
+    line: 'Domains=.'
+    create: yes
+  when: common_enable_production_extras | default(true)
+
+
+
+

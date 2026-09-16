@@ -1,0 +1,30 @@
+server {
+    listen {{ nginx_listen_port | default(80) }} default_server;
+    listen [::]:{{ nginx_listen_port | default(80) }} default_server;
+    server_name _;
+    root {{ pos_web_root }};
+    index index.html;
+
+    add_header X-Cinema-Outlet "{{ outlet_code | default('UNK') }}" always;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Never expose release tree or accidental secret drops under web root
+    location ^~ /releases/ {
+        deny all;
+        return 404;
+    }
+
+    location ~* \.(enc|env)$ {
+        deny all;
+        return 404;
+    }
+
+    location /healthz {
+        access_log off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+}

@@ -1,0 +1,61 @@
+---
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+  tags: [nginx]
+
+- name: Ensure web root
+  ansible.builtin.file:
+    path: "{{ pos_web_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+  tags: [nginx]
+
+- name: Deploy site config
+  ansible.builtin.template:
+    src: cinema-pos.conf.j2
+    dest: /etc/nginx/sites-available/cinema-pos
+    mode: "0644"
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Enable site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/cinema-pos
+    dest: /etc/nginx/sites-enabled/cinema-pos
+    state: link
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Disable default site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Try enable/start nginx via service manager
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  register: nginx_service_start
+  failed_when: false
+  tags: [nginx]
+
+- name: Check whether nginx process is running
+  ansible.builtin.command: pgrep -x nginx
+  register: nginx_proc
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [nginx]
+
+- name: Start nginx binary directly (lab Docker without systemd)
+  ansible.builtin.command: nginx
+  when: nginx_proc.rc != 0
+  tags: [nginx]

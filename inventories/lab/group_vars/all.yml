@@ -1,0 +1,22 @@
+---
+# Non-secret POS / GitHub path settings for lab.
+# Secrets (token, encryption key, DB password) → vault.yml.example (encrypt with ansible-vault).
+
+common_timezone: Asia/Jakarta
+common_perform_upgrade: false
+common_hosts_entries: []
+common_users: []
+common_environment_vars: []
+# Matikan task produksi (systemd ROLE, DNS internal) di lab Docker
+common_enable_production_extras: false
+
+nginx_listen_port: 80
+pos_web_root: /var/www/cinema-pos
+pos_app_title: "Cinema POS Lab"
+
+# GitHub private artifacts (upload via apps/cinema-pos/scripts/package-release.sh)
+pos_github_owner: "CHANGE_ME_OWNER"
+pos_github_repo: "CHANGE_ME_REPO"
+pos_github_ref: "main"
+pos_github_path_zip: "artifacts/cinema-pos.zip"
+pos_github_path_version: "artifacts/cinema-pos-version.json"

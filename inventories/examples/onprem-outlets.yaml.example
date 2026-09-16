@@ -1,0 +1,13 @@
+---
+# Copy ke inventories/onprem/hosts.yml — server cabang LAN/VPN
+outlets:
+  hosts:
+    outlet-jkt:
+      ansible_host: 10.10.1.11
+      ansible_user: ansible
+      ansible_ssh_private_key_file: ~/.ssh/cinema_ansible_ed25519
+      cinema_id: "JKT001"
+      cinema_name: "Cinema Jakarta"
+      device_hostname: "JKTWEB01"
+      primary_ip: "10.10.1.11"
+      backup_ip: "10.10.1.12"

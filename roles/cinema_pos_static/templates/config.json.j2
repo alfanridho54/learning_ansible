@@ -1,0 +1,10 @@
+{
+  "outletCode": "{{ outlet_code | default('UNK') }}",
+  "outletName": "{{ outlet_name | default(cinema_name) }}",
+  "cinemaId": "{{ cinema_id | default('LAB') }}",
+  "appTitle": "{{ pos_app_title | default('Cinema POS') }}",
+  "database": {
+    "name": "cinema_pos",
+    "note": "PostgreSQL di-provision role postgres (tutorial lab)."
+  }
+}

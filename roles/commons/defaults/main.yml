@@ -1,0 +1,15 @@
+# Default packages to install
+common_packages:
+  - curl
+  - vim
+  - git
+  - unzip
+  - htop
+
+# Default timezone
+common_timezone: Asia/Jakarta
+
+# Users to create
+common_users: []
+
+common_hostname: localhost

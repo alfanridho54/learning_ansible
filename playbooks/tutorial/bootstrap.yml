@@ -1,0 +1,16 @@
+---
+- name: Bootstrap baseline outlet (tutorial lab)
+  hosts: outlets
+  become: true
+  vars:
+    common_hostname: "{{ device_hostname }}"
+    common_packages:
+      - curl
+      - vim
+      - git
+      - unzip
+      - python3
+      - rsync
+      - ca-certificates
+  roles:
+    - commons
