@@ -1,185 +1,36 @@
 ---
-- name: Check if PostgreSQL APT key is already added
-  shell: apt-key list | grep -q "PostgreSQL"
-  register: postgres_key_exists
-  ignore_errors: true
-  changed_when: false
+# Simple: install pinned version → start → password → create DB.
+# Version comes from playbooks/tutorial/vars/postgresql-lab.yaml (postgresql_version).
 
-- name: Add PostgreSQL official APT repository key
-  apt_key:
-    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
-    state: present
-  when: postgres_key_exists.rc != 0
-
-
-- name: Check if PostgreSQL repository is already added
-  shell: grep -q "^deb .*postgresql" /etc/apt/sources.list /etc/apt/sources.list.d/* || (test -f /etc/apt/sources.list.d/pgdg.list && grep -q "^deb .*postgresql" /etc/apt/sources.list.d/pgdg.list)
-  register: postgres_repo_exists
-  ignore_errors: true
-  changed_when: false
-
-- name: Add PostgreSQL repository to APT sources
-  apt_repository:
-    repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"
-    state: present
-    filename: "pgdg"
-  when: postgres_repo_exists.rc != 0
-
-- name: Ensure PostgreSQL package is installed
+- name: "Install PostgreSQL {{ postgresql_version }}"
   apt:
-    name: "postgresql-{{ postgresql_version }}"
+    name:
+      - "postgresql-{{ postgresql_version }}"
+      - "postgresql-contrib-{{ postgresql_version }}"
+      - python3-psycopg2
     state: present
-    update_cache: no
-  notify: Restart PostgreSQL  # Notify handler if the PostgreSQL package is installed or updated
+    update_cache: true
 
-- name: Install PostgreSQL dependencies
-  apt:
-    name: python3-psycopg2
-    state: present
-  #become: yes
-
-- name: Ensure PostgreSQL service is enabled and running
+- name: Start PostgreSQL
   service:
     name: postgresql
     state: started
-    enabled: yes
+    enabled: true
 
-- name: Set PostgreSQL to listen on port 5432
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    regexp: '^#?port ='
-    line: "port = {{ postgresql_port }}"
-  notify: Restart PostgreSQL
+- name: Set password for PostgreSQL user postgres
+  shell: >
+    sudo -u postgres psql -c
+    "ALTER USER postgres WITH PASSWORD '{{ postgresql_password }}';"
+  no_log: true
+  changed_when: false
 
-- name: Configure PostgreSQL to listen on all interfaces
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    regexp: "^#?listen_addresses ="
-    line: "listen_addresses = '{{ postgresql_listen_addresses }}'"
-  notify: Restart PostgreSQL
-
-- name: Set PostgreSQL max_connections
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    regexp: '^#?max_connections\s*='
-    line: "max_connections = {{ postgresql_max_connections }}"
-    state: present
-    backrefs: yes
-  notify: Restart PostgreSQL
-
-# handle pg_hba.conf peer and allowed networks for localhost
-- name: Allow app user via socket using password (override peer)
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf
-    line: "local   all             all                    scram-sha-256"
-    insertafter: '^# TYPE'
-    state: present
-  notify: Restart PostgreSQL
-
-- name: Add allowed IP addresses to pg_hba.conf
-  blockinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf
-    create: yes
-    block: |
-      {% for item in postgresql_allowed_networks %}
-      {% if item.network is defined and item.network != '' and not item.network.startswith('/') %}
-      host    all             all             {{ item.network }}            {{ item.auth_method }}
-      {% endif %}
-      {% endfor %}
-    state: present
-  notify: Restart PostgreSQL
-
-- name: Tune shared_buffers (safe for multi-app server)
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    regexp: '^#?shared_buffers\s*='
-    line: "shared_buffers = {{ postgresql_shared_buffers }}"
-  notify: Restart PostgreSQL
-
-# ==============================
-# WAL CONFIGURATION (REPLICATION FIX)
-# ==============================
-- name: Configure PostgreSQL replication settings
-  blockinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    marker: "# {mark} ANSIBLE MANAGED BLOCK - REPLICATION"
-    block: |
-      # REPLICATION CONFIG
-      wal_level = replica
-      max_wal_senders = {{ postgresql_max_wal_senders }}
-      max_replication_slots = {{ postgresql_max_replication_slots }}
-      wal_keep_size = {{ postgresql_wal_keep_size }}
-      max_slot_wal_keep_size = {{ postgresql_max_slot_wal_keep_size }}
-  notify: Restart PostgreSQL
-
-# ==============================
-# POSTGRESQL CONFIGURATION TIMEZONE
-# ==============================
-- name: Set PostgreSQL timezone
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    regexp: "^#?timezone ="
-    line: "timezone = '{{ postgresql_timezone | default('Asia/Jakarta') }}'"
-  notify: Restart PostgreSQL
-
-- name: Set PostgreSQL log_timezone
-  lineinfile:
-    path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
-    regexp: "^#?log_timezone ="
-    line: "log_timezone = '{{ postgresql_timezone | default('Asia/Jakarta') }}'"
-  notify: Restart PostgreSQL
-  
-# ==============================
-# SYSTEMD ULIMIT (IMPORTANT)
-# ==============================
-- name: Create systemd override directory for PostgreSQL
-  file:
-    path: /etc/systemd/system/postgresql.service.d
-    state: directory
-    mode: '0755'
-
-- name: Set PostgreSQL ulimit (nofile)
-  copy:
-    dest: /etc/systemd/system/postgresql.service.d/limits.conf
-    content: |
-      [Service]
-      LimitNOFILE=10000
-  notify:
-    - Reload systemd
-    - Restart PostgreSQL
-
-
-- name: Debug postgresql_allowed_networks
-  debug:
-    var: postgresql_replication_role
-
-- name: Set password for PostgreSQL user "postgres"
-  shell: "sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD '{{ postgresql_password }}';\""
+- name: Create application databases
+  shell: |
+    sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '{{ item.name }}'" | grep -q 1 \
+      || sudo -u postgres psql -c "CREATE DATABASE {{ item.name }} ENCODING '{{ item.encoding | default('UTF8') }}' TEMPLATE template0;"
   args:
-    creates: /tmp/postgres-password-set
-  when: postgresql_replication_role == 'primary'
-
-  # when: postgresql_replication_role is not defined or postgresql_replication_role != 'backup'
-
-- name: Ensure locale exists
-  ansible.builtin.command: locale-gen en_US.UTF-8
-  when: postgresql_replication_role == 'primary'
-  notify:
-    - Restart PostgreSQL
-
-- name: Create PostgreSQL database if not exists
-  become_user: postgres
-  become_flags: '-i'
-  community.postgresql.postgresql_db:
-    name: "{{ item.name }}"
-    encoding: "{{ item.encoding | default('UTF8') }}"
-    # locale_provider: "icu"
-    # icu_locale: "en-US"
-    lc_collate: "{{ item.lc_collate | default('en_US.UTF-8') }}"
-    lc_ctype: "{{ item.lc_ctype | default('en_US.UTF-8') }}"
-    template: template0
-    state: present
+    executable: /bin/bash
   loop: "{{ postgresql_databases }}"
-  when: postgresql_replication_role == 'primary'
-
-
+  when: postgresql_databases | length > 0
+  register: postgresql_db_create
+  changed_when: "'CREATE DATABASE' in (postgresql_db_create.stdout | default(''))"

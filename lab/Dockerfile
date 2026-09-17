@@ -15,7 +15,7 @@ RUN apt-get update \
   && echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
 
 COPY ssh/authorized_keys /home/ansible/.ssh/authorized_keys
-RUN chown -R ansible:ansible /home/ansible/.ssh \
+RUN chown -R ansible:ansible /home/ansible \
   && chmod 700 /home/ansible/.ssh \
   && chmod 600 /home/ansible/.ssh/authorized_keys
 

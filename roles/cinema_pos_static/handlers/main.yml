@@ -4,10 +4,3 @@
     name: nginx
     state: reloaded
   ignore_errors: true
-
-- name: Restart cinema-pos-version timer
-  ansible.builtin.systemd:
-    name: cinema-pos-version.timer
-    state: restarted
-    enabled: true
-    daemon_reload: true

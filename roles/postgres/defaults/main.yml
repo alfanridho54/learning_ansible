@@ -1,0 +1,6 @@
+---
+postgresql_version: "14"
+postgresql_password: "{{ vault_postgres_password | default('cinema-lab-change-me') }}"
+postgresql_databases:
+  - name: cinema_pos
+    encoding: UTF8

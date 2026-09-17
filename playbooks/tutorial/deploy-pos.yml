@@ -1,8 +1,0 @@
----
-- name: Deploy / update Cinema POS static only
-  hosts: outlets
-  become: true
-  serial: 1
-  roles:
-    - role: cinema_pos_static
-      tags: [pos, app]

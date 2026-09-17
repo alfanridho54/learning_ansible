@@ -1,29 +1,20 @@
 ---
 # Web root served by Nginx (static Vite assets + public config.json)
 pos_web_root: /var/www/cinema-pos
-pos_releases_dir: "{{ pos_web_root }}/releases"
 pos_config_filename: config.json
 
-# Secrets & updater live OUTSIDE the web root
+# Path app di control node (relatif terhadap playbooks/tutorial/)
+pos_local_app_path: "{{ playbook_dir }}/../../apps/cinema-pos"
+pos_local_dist_path: "{{ pos_local_app_path }}/dist"
+
+# Secrets live OUTSIDE the web root
 pos_opt_dir: /opt/cinema-pos
-pos_log_dir: /var/log/cinema-pos
-pos_version_script: "{{ pos_opt_dir }}/cinema_pos_version.sh"
-pos_local_version_file: "{{ pos_opt_dir }}/cinema-pos-version.json"
-pos_new_version_file: "{{ pos_opt_dir }}/cinema-pos-version_new.json"
 pos_config_enc_path: "{{ pos_opt_dir }}/config.enc"
 
-# GitHub private artifacts (set real values in group_vars / vault)
-pos_github_owner: "CHANGE_ME_OWNER"
-pos_github_repo: "CHANGE_ME_REPO"
-pos_github_ref: "main"
-pos_github_path_zip: "artifacts/cinema-pos.zip"
-pos_github_path_version: "artifacts/cinema-pos-version.json"
-# Prefer vault: vault_github_token / vault_pos_encryption_key
-pos_github_token: "{{ vault_github_token | default('') }}"
+# Prefer vault: vault_pos_encryption_key / vault_postgres_password
 pos_encryption_key: "{{ vault_pos_encryption_key | default('cinema-lab-32char-secret-key!!!!') }}"
 
 pos_database_url: >-
   postgresql://postgres:{{ vault_postgres_password | default('cinema-lab-change-me') }}@127.0.0.1:5432/cinema_pos
 
 pos_node_bin: /usr/bin/node
-pos_keep_releases: 5

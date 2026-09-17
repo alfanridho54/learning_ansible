@@ -29,15 +29,19 @@
     line: "{{ item.ip }}\t{{ item.hostname }}"
     regexp: "^{{ item.ip }}\\s+"
     state: present
+    # Docker (lab) mounts /etc/hosts — atomic rename fails with EBUSY
+    unsafe_writes: true
   loop: "{{ common_hosts_entries }}"
   loop_control:
     label: "{{ item.ip }} -> {{ item.hostname }}"
+  when: common_hosts_entries | length > 0
 
 - name: Set in /etc/hosts
   lineinfile:
     regexp: "^127.0.0.1"
     dest: "/etc/hosts"
     line: "127.0.0.1   localhost   {{ hostname.name }}"
+    unsafe_writes: true
   when: hostname.changed
 
 - name: Set in /etc/hosts
@@ -45,6 +49,7 @@
     regexp: "{{ ansible_hostname }}"
     dest: "/etc/hosts"
     replace: "{{ hostname.name }}"
+    unsafe_writes: true
   when: hostname.changed
 
 

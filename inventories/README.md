@@ -13,5 +13,5 @@ Deep Dive ini **fully on-prem** — tidak ada inventory cloud.
 cp inventories/lab/group_vars/vault.yml.example inventories/lab/group_vars/vault.yml
 # edit token/keys, lalu:
 ansible-vault encrypt inventories/lab/group_vars/vault.yml
-ansible-playbook -i inventories/lab/hosts.yml playbooks/tutorial/site.yml --ask-vault-pass
+ansible-playbook -i inventories/lab/hosts.yml playbooks/tutorial/01-installation-server.yml --ask-vault-pass
 ```

@@ -1,5 +1,5 @@
 ---
-- name: Deploy cinema outlet stack (tutorial lab)
+- name: Installation server — cinema outlet stack (tutorial lab)
   hosts: outlets
   become: true
   serial: 1
