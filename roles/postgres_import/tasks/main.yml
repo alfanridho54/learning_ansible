@@ -8,6 +8,7 @@
   args:
     executable: /bin/bash
   loop: "{{ postgresql_import.databases }}"
+  no_log: true
 
 - name: Copy SQL file to remote server
   copy:
@@ -18,6 +19,7 @@
     mode: '0644'
   when: item.sql_file_src is defined
   loop: "{{ postgresql_import.databases }}"
+  no_log: true
 
 - name: Import SQL data into PostgreSQL databases
   shell: |
@@ -26,10 +28,12 @@
     executable: /bin/bash
   when: item.sql_file_dest is defined
   loop: "{{ postgresql_import.databases }}"
+  no_log: true
 
 - name: Remove SQL file from remote server
   file:
     path: "{{ item.sql_file_dest }}"
     state: absent
   loop: "{{ postgresql_import.databases }}"
+  no_log: true
 
