@@ -1,0 +1,15 @@
+---
+# Non-secret settings for lab.
+# Secrets (encryption key, DB password) → vault.yml.example (encrypt with ansible-vault).
+
+common_timezone: Asia/Jakarta
+common_perform_upgrade: false
+common_hosts_entries: []
+common_users: []
+common_environment_vars: []
+# Matikan task produksi (systemd ROLE, DNS internal) di lab Docker
+common_enable_production_extras: false
+
+nginx_listen_port: 80
+pos_web_root: /var/www/cinema-pos
+pos_app_title: "Cinema POS Lab"
