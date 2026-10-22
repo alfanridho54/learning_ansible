@@ -13,10 +13,10 @@ pipeline {
         sh 'ansible-playbook -i inventories/jenkins/hosts.yml playbooks/tutorial/01-installation-server.yml --syntax-check'
       }
     }
-    stage('Deploy JKT') {
+    stage('Deploy Outlets') {
       steps {
         withCredentials([sshUserPrivateKey(credentialsId: 'ansible-lab-ssh-key', keyFileVariable: 'SSH_KEY')]) {
-          sh 'ansible-playbook -i inventories/jenkins/hosts.yml playbooks/tutorial/01-installation-server.yml --limit outlet-jkt --private-key "$SSH_KEY"'
+          sh 'ansible-playbook -i inventories/jenkins/hosts.yml playbooks/tutorial/01-installation-server.yml --private-key "$SSH_KEY"'
         }
       }
     }
